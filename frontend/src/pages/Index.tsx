@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { Header } from "@/components/Header";
 import { DataContextPanel } from "@/components/DataContextPanel";
 import { QueryResultsPanel } from "@/components/QueryResultsPanel";
+import { MonitoringPanel } from "@/components/MonitoringPanel";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/api";
 
 export interface DatasetInfo {
@@ -21,6 +23,8 @@ export interface QueryResult {
   sql: string;
   status: "verified" | "error" | "rejected";
   latency: number;
+  cost?: number;
+  total_cost?: number;
   data: Record<string, any>[];
 }
 
@@ -108,7 +112,7 @@ const Index = () => {
     
     try {
       const result = await api.generateSQL(question);
-      const latency = (Date.now() - startTime) / 1000;
+      const latency = result.latency || (Date.now() - startTime) / 1000;
       
       // Convert the array of arrays result to array of objects
       const data = result.result.map(row => {
@@ -124,12 +128,23 @@ const Index = () => {
         sql: result.sql_query,
         status: "verified",
         latency,
+        cost: result.cost,
+        total_cost: result.total_cost,
         data
       });
-    } catch (error) {
+    } catch (error: any) {
       const latency = (Date.now() - startTime) / 1000;
+      
+      // Extract dynamic error message from API response
+      let errorMessage = `Error processing query: "${question}"`;
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      
       setQueryResult({
-        explanation: `Error processing query: "${question}"`,
+        explanation: errorMessage,
         sql: "",
         status: "error",
         latency,
@@ -153,13 +168,28 @@ const Index = () => {
           />
         </div>
         
-        {/* Right Column - Query & Results Panel */}
+        {/* Right Column - Tabbed Interface */}
         <div className="flex-1">
-          <QueryResultsPanel 
-            dataset={dataset}
-            queryResult={queryResult}
-            onQuery={handleQuery}
-          />
+          <Tabs defaultValue="query" className="h-full">
+            <div className="border-b border-border px-6 py-2">
+              <TabsList>
+                <TabsTrigger value="query">Query & Results</TabsTrigger>
+                <TabsTrigger value="monitoring">API Monitoring</TabsTrigger>
+              </TabsList>
+            </div>
+            
+            <TabsContent value="query" className="h-[calc(100%-3rem)] m-0">
+              <QueryResultsPanel 
+                dataset={dataset}
+                queryResult={queryResult}
+                onQuery={handleQuery}
+              />
+            </TabsContent>
+            
+            <TabsContent value="monitoring" className="h-[calc(100%-3rem)] m-0 p-6">
+              <MonitoringPanel />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>
