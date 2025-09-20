@@ -1,0 +1,21 @@
+customer_id,name,email,age,city,country,registration_date,is_premium,total_spent,last_purchase_date
+1001,John Smith,john.smith@email.com,35,New York,USA,2023-01-15,true,1250.75,2024-09-10
+1002,Sarah Johnson,sarah.j@email.com,28,London,UK,2023-02-20,false,450.30,2024-08-15
+1003,Mike Chen,mike.chen@email.com,42,Toronto,Canada,2023-01-08,true,2100.50,2024-09-18
+1004,Emma Wilson,emma.w@email.com,31,Sydney,Australia,2023-03-12,false,780.25,2024-07-22
+1005,Carlos Rodriguez,carlos.r@email.com,45,Madrid,Spain,2023-02-28,true,1850.90,2024-09-05
+1006,Anna Kowalski,anna.k@email.com,29,Warsaw,Poland,2023-04-10,false,320.15,2024-06-30
+1007,Raj Patel,raj.patel@email.com,38,Mumbai,India,2023-01-25,true,950.60,2024-09-12
+1008,Lisa Anderson,lisa.a@email.com,26,Stockholm,Sweden,2023-03-15,false,640.85,2024-08-20
+1009,David Kim,david.kim@email.com,33,Seoul,South Korea,2023-02-05,true,1450.40,2024-09-14
+1010,Maria Garcia,maria.g@email.com,37,Barcelona,Spain,2023-04-18,false,580.70,2024-07-15
+1011,James Brown,james.b@email.com,44,Melbourne,Australia,2023-01-30,true,2250.30,2024-09-08
+1012,Sophie Martin,sophie.m@email.com,32,Paris,France,2023-03-22,false,890.45,2024-08-25
+1013,Alex Petrov,alex.p@email.com,39,Moscow,Russia,2023-02-14,true,1680.20,2024-09-16
+1014,Jessica Taylor,jessica.t@email.com,27,Chicago,USA,2023-04-05,false,430.55,2024-07-18
+1015,Roberto Silva,roberto.s@email.com,41,São Paulo,Brazil,2023-01-12,true,1920.80,2024-09-11
+1016,Nina Larsson,nina.l@email.com,30,Oslo,Norway,2023-03-08,false,720.95,2024-08-28
+1017,Ahmed Hassan,ahmed.h@email.com,36,Cairo,Egypt,2023-02-22,true,1120.65,2024-09-13
+1018,Kate Murphy,kate.m@email.com,34,Dublin,Ireland,2023-04-12,false,510.40,2024-07-20
+1019,Liu Wei,liu.wei@email.com,40,Shanghai,China,2023-01-18,true,1750.25,2024-09-17
+1020,Elena Rossi,elena.r@email.com,43,Rome,Italy,2023-03-25,false,820.35,2024-08-12
