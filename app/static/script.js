@@ -30,16 +30,35 @@ document.getElementById('upload-btn').addEventListener('click', async () => {
     }
 });
 
+// Load monitoring info on page load
+async function loadMonitoringInfo() {
+    try {
+        const response = await fetch('/monitoring');
+        const data = await response.json();
+        
+        document.getElementById('cost-info').textContent = `Cost: $${data.total_cost} / $${data.cost_cap}`;
+        document.getElementById('latency-info').textContent = `Avg Latency: ${data.average_latency}s`;
+        document.getElementById('request-count').textContent = `Requests: ${data.total_requests}`;
+    } catch (error) {
+        console.error('Error loading monitoring info:', error);
+    }
+}
+
+// Load monitoring info on page load
+document.addEventListener('DOMContentLoaded', loadMonitoringInfo);
+
 document.getElementById('generate-btn').addEventListener('click', async () => {
     const question = document.getElementById('question').value;
     const sqlQueryElem = document.getElementById('sql-query');
     const resultTableBody = document.querySelector('#result-table tbody');
     const resultTableHead = document.querySelector('#result-table thead');
     const loadingElem = document.getElementById('loading');
+    const queryMetrics = document.getElementById('query-metrics');
 
     sqlQueryElem.textContent = '';
     resultTableBody.innerHTML = '';
     resultTableHead.innerHTML = '';
+    queryMetrics.innerHTML = '';
     loadingElem.style.display = 'block';
 
     const response = await fetch('/generate_sql', {
@@ -57,6 +76,17 @@ document.getElementById('generate-btn').addEventListener('click', async () => {
         sqlQueryElem.textContent = `Error: ${data.error}`;
     } else {
         sqlQueryElem.textContent = data.sql_query;
+
+        // Display query metrics
+        if (data.latency && data.cost) {
+            queryMetrics.innerHTML = `
+                <div class="metrics">
+                    <span>Latency: ${data.latency}s</span> | 
+                    <span>Cost: $${data.cost}</span> | 
+                    <span>Total Cost: $${data.total_cost}</span>
+                </div>
+            `;
+        }
 
         // Populate table header
         const headerRow = document.createElement('tr');
@@ -78,5 +108,8 @@ document.getElementById('generate-btn').addEventListener('click', async () => {
             });
             resultTableBody.appendChild(tr);
         });
+        
+        // Update monitoring info after successful query
+        loadMonitoringInfo();
     }
 });

@@ -1,0 +1,22 @@
+[
+    {
+        "question": "How many departments are there?",
+        "query": "SELECT count(*) FROM department"
+    },
+    {
+        "question": "List the names of all faculty members and their department names.",
+        "query": "SELECT T1.fac_name, T2.dept_name FROM faculty AS T1 JOIN department AS T2 ON T1.dept_id  =  T2.dept_id"
+    },
+    {
+        "question": "How many publications does each faculty member have? List their name and the count.",
+        "query": "SELECT T2.fac_name, count(*) FROM publication AS T1 JOIN faculty AS T2 ON T1.fac_id  =  T2.fac_id GROUP BY T1.fac_id"
+    },
+    {
+        "question": "What are the departments with more than 1 faculty member?",
+        "query": "SELECT T2.dept_name FROM faculty AS T1 JOIN department AS T2 ON T1.dept_id  =  T2.dept_id GROUP BY T1.dept_id HAVING count(*)  >  1"
+    },
+    {
+        "question": "Find the titles of publications published in the year 2010.",
+        "query": "SELECT title FROM publication WHERE year  =  2010"
+    }
+]

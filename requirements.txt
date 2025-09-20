@@ -1,4 +1,6 @@
 Flask
+flask-cors
 google-generativeai
 python-dotenv
 pandas
+Faker

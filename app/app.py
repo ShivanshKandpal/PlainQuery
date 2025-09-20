@@ -6,15 +6,28 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 import pandas as pd
 import json
+import time
+from datetime import datetime
+import urllib3
+
+# Suppress SSL warnings for development
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+CORS(app)  # Enable CORS for all routes (needed for frontend)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 
 # Configure the Gemini API
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
+# Monitoring data
+monitoring_data = {
+    'requests': [],
+    'total_cost': 0.0,
+    'cost_cap': 10.0  # $10 daily limit
+}
 
 def get_db_schema(db_path='database.db'):
     """
@@ -227,6 +240,12 @@ def get_schema():
 
 @app.route('/generate_sql', methods=['POST'])
 def generate_sql():
+    start_time = time.time()
+    
+    # Check cost cap
+    if monitoring_data['total_cost'] >= monitoring_data['cost_cap']:
+        return jsonify({'error': 'Daily cost cap reached. Please try again tomorrow.'}), 429
+    
     question = request.json['question']
     
     schema = None
@@ -244,35 +263,77 @@ def generate_sql():
     if not schema:
         schema = get_db_schema()
 
-    model = genai.GenerativeModel('gemini-2.0-flash')
+    model = genai.GenerativeModel('gemini-1.5-flash')
 
     prompt = f"""
-    You are an expert SQL developer. Your task is to generate a precise SQL query to answer the user's question based on the provided database schema.
+    You are an expert SQL query generator with a focus on security and accuracy. Generate ONLY a SELECT statement to answer the user's question.
 
-    If the user's question is a valid request for data, generate the SQL query.
-    If the user's question is NOT a valid request for data (e.g., it's a greeting, a random statement, or doesn't make sense in a data context), return the single word "INVALID".
+    CRITICAL SECURITY RULES:
+    1. ONLY generate SELECT statements - no INSERT, UPDATE, DELETE, DROP, CREATE, ALTER, or any data modification commands
+    2. Do NOT use any SQL functions that could modify data or system state
+    3. If the question asks for data modification, return "INVALID"
 
-    ### Database Schema and Statistics:
+    QUERY OPTIMIZATION RULES:
+    1. Use INNER JOIN by default for relationships - only use LEFT JOIN when explicitly asked to include records with no matches
+    2. Always use proper WHERE clauses to filter data efficiently
+    3. Use aggregate functions (COUNT, SUM, AVG, MAX, MIN) when appropriate
+    4. Include ORDER BY clauses when logical (e.g., sorting by date, amount, name)
+    5. Use LIMIT when appropriate to prevent excessive results
+    6. Group by the correct columns when using aggregate functions
+    7. Use proper aliases for readability: table aliases (t1, c, p) and column aliases (AS total_amount)
+
+    VALIDATION RULES:
+    1. If the question is not a data query (greetings, random statements, non-data questions), return exactly "INVALID"
+    2. If the question asks to modify, delete, or create data, return exactly "INVALID"
+    3. Ensure all column names and table names exist in the provided schema
+    4. Use proper SQL syntax for the SQLite dialect
+
+    ### Database Schema:
     {schema}
 
     ### User Question:
     "{question}"
 
-    ### Output (SQL Query or "INVALID"):
+    ### Instructions:
+    Generate a syntactically correct SELECT query that accurately answers the question. Return ONLY the SQL query without any explanation, formatting, or code blocks. If the question is invalid or asks for data modification, return exactly "INVALID".
+
+    ### SQL Query:
     """
 
     try:
         response = model.generate_content(prompt)
         output = response.text.strip().replace("```sql", "").replace("```", "").strip()
+        
+        # Calculate latency and estimated cost
+        latency = time.time() - start_time
+        estimated_cost = estimate_api_cost(prompt, output)
+        monitoring_data['total_cost'] += estimated_cost
+        
+        # Log request for monitoring
+        monitoring_data['requests'].append({
+            'timestamp': datetime.now().isoformat(),
+            'question': question,
+            'latency': latency,
+            'cost': estimated_cost,
+            'total_cost': monitoring_data['total_cost']
+        })
 
         if output.upper() == 'INVALID':
             return jsonify({'error': "I'm sorry, I can only answer questions related to the data. Please ask a question about the database content."}), 400
 
         sql_query = output
         
-        # Safety Check: Only allow SELECT statements
-        if not sql_query.strip().upper().startswith('SELECT'):
-            return jsonify({'error': 'For security reasons, only SELECT queries are allowed.'}), 403
+        # Enhanced Safety Check: Only allow SELECT statements and block dangerous patterns
+        sql_upper = sql_query.strip().upper()
+        dangerous_keywords = ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'CREATE', 'ALTER', 'TRUNCATE', 'EXEC', 'EXECUTE', '--', ';', 'PRAGMA']
+        
+        if not sql_upper.startswith('SELECT'):
+            return jsonify({'error': 'Security violation: Only SELECT statements are allowed.'}), 403
+            
+        # Check for dangerous patterns within the query
+        for keyword in dangerous_keywords:
+            if keyword in sql_upper:
+                return jsonify({'error': f'Security violation: Dangerous SQL pattern detected ({keyword}). Only read-only SELECT queries are permitted.'}), 403
 
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
@@ -281,10 +342,54 @@ def generate_sql():
         column_names = [description[0] for description in c.description]
         conn.close()
         
-        return jsonify({'sql_query': sql_query, 'result': result, 'columns': column_names})
+        return jsonify({
+            'sql_query': sql_query, 
+            'result': result, 
+            'columns': column_names,
+            'latency': round(latency, 3),
+            'cost': round(estimated_cost, 6),
+            'total_cost': round(monitoring_data['total_cost'], 6)
+        })
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+def estimate_api_cost(prompt, response):
+    """Estimate API cost based on token usage (approximate)"""
+    # Gemini 1.5 Flash pricing: roughly $0.075 per 1M input tokens, $0.30 per 1M output tokens
+    input_tokens = len(prompt.split()) * 1.3  # Rough approximation
+    output_tokens = len(response.split()) * 1.3
+    
+    input_cost = (input_tokens / 1_000_000) * 0.075
+    output_cost = (output_tokens / 1_000_000) * 0.30
+    
+    return input_cost + output_cost
+
+
+@app.route('/monitoring', methods=['GET'])
+def get_monitoring():
+    """Get monitoring data including latency, cost, and request history"""
+    return jsonify({
+        'total_requests': len(monitoring_data['requests']),
+        'total_cost': round(monitoring_data['total_cost'], 6),
+        'cost_cap': monitoring_data['cost_cap'],
+        'remaining_budget': round(monitoring_data['cost_cap'] - monitoring_data['total_cost'], 6),
+        'recent_requests': monitoring_data['requests'][-10:],  # Last 10 requests
+        'average_latency': round(
+            sum(req['latency'] for req in monitoring_data['requests']) / len(monitoring_data['requests'])
+            if monitoring_data['requests'] else 0, 3
+        )
+    })
+
+
+@app.route('/reset_monitoring', methods=['POST'])
+def reset_monitoring():
+    """Reset monitoring data (for testing/daily reset)"""
+    monitoring_data['requests'] = []
+    monitoring_data['total_cost'] = 0.0
+    return jsonify({'message': 'Monitoring data reset successfully'})
+
 
 if __name__ == '__main__':
     if not os.path.exists('uploads'):
