@@ -1,0 +1,26 @@
+order_id,customer_id,product_name,category,price,quantity,order_date,status,discount_percent,shipping_cost
+ORD001,1001,Wireless Headphones,Electronics,89.99,2,2024-09-10,shipped,10,5.99
+ORD002,1002,Running Shoes,Sports,129.50,1,2024-08-15,delivered,0,7.50
+ORD003,1003,Laptop Backpack,Accessories,45.00,1,2024-09-18,shipped,15,4.99
+ORD004,1001,Bluetooth Speaker,Electronics,75.25,1,2024-09-08,delivered,5,6.99
+ORD005,1004,Yoga Mat,Sports,35.99,2,2024-07-22,delivered,0,3.99
+ORD006,1005,Coffee Maker,Home & Kitchen,185.00,1,2024-09-05,shipped,20,12.99
+ORD007,1002,Phone Case,Accessories,19.99,3,2024-08-12,delivered,0,2.99
+ORD008,1006,Gaming Mouse,Electronics,65.75,1,2024-06-30,delivered,10,5.99
+ORD009,1007,Protein Powder,Health,89.95,2,2024-09-12,shipped,0,8.99
+ORD010,1003,Office Chair,Furniture,245.50,1,2024-09-15,processing,25,19.99
+ORD011,1008,Smart Watch,Electronics,199.99,1,2024-08-20,delivered,15,9.99
+ORD012,1009,Basketball,Sports,29.99,1,2024-09-14,shipped,0,4.99
+ORD013,1010,Kitchen Knife Set,Home & Kitchen,89.99,1,2024-07-15,delivered,10,6.99
+ORD014,1011,Desk Lamp,Home & Office,42.50,2,2024-09-08,delivered,0,5.99
+ORD015,1012,Winter Jacket,Clothing,159.99,1,2024-08-25,shipped,20,11.99
+ORD016,1013,Book Collection,Books,79.95,1,2024-09-16,delivered,5,7.99
+ORD017,1014,Skincare Set,Beauty,125.00,1,2024-07-18,delivered,15,8.99
+ORD018,1015,Travel Luggage,Travel,299.99,1,2024-09-11,shipped,30,24.99
+ORD019,1016,Fitness Tracker,Electronics,149.99,1,2024-08-28,delivered,10,7.99
+ORD020,1017,Tea Set,Home & Kitchen,65.50,1,2024-09-13,shipped,0,6.99
+ORD021,1018,Sunglasses,Accessories,89.95,2,2024-07-20,delivered,20,5.99
+ORD022,1019,Tablet Stand,Electronics,29.99,1,2024-09-17,shipped,0,3.99
+ORD023,1020,Wine Glasses,Home & Kitchen,55.75,4,2024-08-12,delivered,10,8.99
+ORD024,1001,Power Bank,Electronics,39.99,1,2024-09-09,delivered,0,4.99
+ORD025,1005,Cooking Pan Set,Home & Kitchen,120.00,1,2024-09-03,shipped,15,10.99
