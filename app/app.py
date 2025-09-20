@@ -8,6 +8,10 @@ import pandas as pd
 import json
 import time
 from datetime import datetime
+import urllib3
+
+# Suppress SSL warnings for development
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 load_dotenv()
 
