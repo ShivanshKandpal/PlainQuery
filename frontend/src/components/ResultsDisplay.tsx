@@ -42,8 +42,18 @@ export const ResultsDisplay = ({ result }: ResultsDisplayProps) => {
           <div className="flex items-center gap-3">
             {getStatusBadge()}
             <span className="text-xs text-muted">
-              (Generated in {result.latency}s)
+              {result.latency}s
             </span>
+            {result.cost && (
+              <span className="text-xs text-muted">
+                ${result.cost.toFixed(6)}
+              </span>
+            )}
+            {result.total_cost && (
+              <span className="text-xs text-muted">
+                (Total: ${result.total_cost.toFixed(6)})
+              </span>
+            )}
           </div>
         </div>
         <p className="text-sm text-muted">

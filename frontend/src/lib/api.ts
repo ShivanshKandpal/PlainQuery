@@ -4,6 +4,24 @@ export interface ApiQueryResult {
   sql_query: string;
   result: any[][];
   columns: string[];
+  latency: number;
+  cost: number;
+  total_cost: number;
+}
+
+export interface ApiMonitoringResult {
+  total_requests: number;
+  total_cost: number;
+  cost_cap: number;
+  remaining_budget: number;
+  recent_requests: Array<{
+    timestamp: string;
+    question: string;
+    latency: number;
+    cost: number;
+    total_cost: number;
+  }>;
+  average_latency: number;
 }
 
 export interface ApiError {
@@ -79,6 +97,30 @@ export const api = {
     if (!response.ok) {
       const error: ApiError = await response.json();
       throw new Error(error.error || 'Failed to get schema');
+    }
+
+    return response.json();
+  },
+
+  async getMonitoring(): Promise<ApiMonitoringResult> {
+    const response = await fetch(`${API_BASE_URL}/monitoring`);
+
+    if (!response.ok) {
+      const error: ApiError = await response.json();
+      throw new Error(error.error || 'Failed to get monitoring data');
+    }
+
+    return response.json();
+  },
+
+  async resetMonitoring(): Promise<{ message: string }> {
+    const response = await fetch(`${API_BASE_URL}/reset_monitoring`, {
+      method: 'POST',
+    });
+
+    if (!response.ok) {
+      const error: ApiError = await response.json();
+      throw new Error(error.error || 'Failed to reset monitoring');
     }
 
     return response.json();
