@@ -74,9 +74,5 @@ The application is aware of the database schema (tables and columns), which allo
 - **% auto-resolved**: A high percentage of natural language questions can be successfully converted to SQL.
 - **Exec-accuracy**: The generated SQL is syntactically correct and semantically answers the user's question.
 
-### Next 2 Weeks
-- Expand the database schema with more complex relationships.
-- Improve the prompt for the Gemini API to handle more complex queries.
-- Add support for different SQL dialects (e.g., PostgreSQL, MySQL).
-- Implement user authentication and query history.
-- Enhance the UI to include data visualizations.
+
+
