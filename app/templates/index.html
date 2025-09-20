@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI SQL Copilot</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>AI SQL Copilot</h1>
+        
+        <div class="monitoring-section">
+            <h3>System Status</h3>
+            <div id="monitoring-info">
+                <span id="cost-info">Cost: $0.00 / $10.00</span>
+                <span id="latency-info">Avg Latency: 0.0s</span>
+                <span id="request-count">Requests: 0</span>
+            </div>
+        </div>
+        
+        <div class="upload-section">
+            <h2>1. Upload a CSV File</h2>
+            <input type="file" id="csv-file" accept=".csv">
+            <button id="upload-btn">Upload</button>
+            <div id="upload-status"></div>
+        </div>
+
+        <p>Ask a question in natural language, and the AI will generate the corresponding SQL query.</p>
+        <textarea id="question" placeholder="e.g., Show me all orders from Alice"></textarea>
+        <button id="generate-btn">Generate SQL</button>
+        <div id="loading" style="display: none;">Generating...</div>
+        <div id="result">
+            <h2>Generated SQL Query:</h2>
+            <pre id="sql-query"></pre>
+            <div id="query-metrics"></div>
+            <h2>Query Result:</h2>
+            <table id="result-table">
+                <thead></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
