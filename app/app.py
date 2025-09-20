@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, render_template
+from flask_cors import CORS
 import sqlite3
 import os
 import google.generativeai as genai
@@ -11,6 +12,7 @@ from datetime import datetime
 load_dotenv()
 
 app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes (needed for frontend)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 
 # Configure the Gemini API
@@ -75,6 +77,74 @@ def get_db_schema(db_path='database.db'):
     conn.close()
     return schema_str
 
+def parse_schema_for_frontend(schema_text, table_name, row_count):
+    """
+    Parse the schema text to extract column information for frontend display
+    """
+    columns = []
+    lines = schema_text.split('\n')
+    
+    in_table = False
+    for line in lines:
+        if f"Table '{table_name}'" in line:
+            in_table = True
+            continue
+        elif line.startswith("Table '") and in_table:
+            break
+        elif in_table and line.strip().startswith("- Column '"):
+            # Parse column information
+            # Example: "  - Column 'customer_id' (type: TEXT) | Stats: min=1001, max=1020, avg=1010.50"
+            try:
+                parts = line.split("'")
+                if len(parts) >= 2:
+                    col_name = parts[1]
+                    
+                    # Extract type
+                    type_part = line.split("(type: ")[1].split(")")[0] if "(type: " in line else "TEXT"
+                    
+                    # Map SQLite types to frontend types
+                    frontend_type = "string"
+                    if type_part in ["INTEGER", "BIGINT"]:
+                        frontend_type = "number"
+                    elif type_part in ["REAL", "FLOAT", "DOUBLE", "DECIMAL"]:
+                        frontend_type = "number"
+                    elif "DATE" in type_part or "TIME" in type_part:
+                        frontend_type = "date"
+                    elif type_part == "BOOLEAN":
+                        frontend_type = "boolean"
+                    
+                    # Extract stats - improved parsing
+                    stats = "No stats available"
+                    if "| Stats: " in line:
+                        stats_part = line.split("| Stats: ")[1].strip()
+                        stats = stats_part
+                    elif "| Top values: " in line:
+                        stats_part = line.split("| Top values: ")[1].strip()
+                        stats = f"Top values: {stats_part}"
+                    elif "| (Could not compute stats)" in line:
+                        stats = "Stats unavailable"
+                    elif "|" in line:
+                        # Fallback - extract whatever comes after the |
+                        stats_part = line.split("|")[1].strip()
+                        if stats_part and stats_part != "(Could not compute stats)":
+                            stats = stats_part
+                    
+                    columns.append({
+                        "name": col_name,
+                        "type": frontend_type,
+                        "stats": stats
+                    })
+            except Exception as e:
+                # If parsing fails, add basic info
+                print(f"Warning: Could not parse line: {line}, error: {e}")
+                continue
+    
+    return {
+        "table_name": table_name,
+        "row_count": row_count,
+        "columns": columns
+    }
+
 @app.route('/upload_csv', methods=['POST'])
 def upload_csv():
     if 'file' not in request.files:
@@ -101,13 +171,68 @@ def upload_csv():
         with open(context_filepath, 'w') as f:
             json.dump({'schema': context, 'db_path': db_path}, f)
 
-        return jsonify({'message': 'File processed successfully', 'filename': filename}), 200
+        # Parse schema to return structured information
+        schema_info = parse_schema_for_frontend(context, table_name, len(df))
+
+        return jsonify({
+            'message': 'File processed successfully', 
+            'filename': filename,
+            'schema': context,
+            'schema_info': schema_info
+        }), 200
 
     return jsonify({'error': 'Invalid file type'}), 400
 
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/schema', methods=['GET'])
+def get_schema():
+    """Get database schema for frontend"""
+    try:
+        schema = get_db_schema()
+        
+        # Get table names and row counts to provide structured info
+        conn = sqlite3.connect('database.db')
+        c = conn.cursor()
+        c.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = c.fetchall()
+        
+        schema_info = {
+            "table_name": "multiple_tables",
+            "row_count": 0,
+            "columns": []
+        }
+        
+        # If there's only one table, provide detailed info for it
+        if len(tables) == 1:
+            table_name = tables[0][0]
+            c.execute(f"SELECT COUNT(*) FROM {table_name}")
+            row_count = c.fetchone()[0]
+            schema_info = parse_schema_for_frontend(schema, table_name, row_count)
+        elif len(tables) > 1:
+            # Multiple tables - provide summary
+            total_rows = 0
+            for table in tables:
+                table_name = table[0]
+                c.execute(f"SELECT COUNT(*) FROM {table_name}")
+                total_rows += c.fetchone()[0]
+            
+            schema_info = {
+                "table_name": f"{len(tables)} tables",
+                "row_count": total_rows,
+                "columns": [{"name": f"Tables: {', '.join([t[0] for t in tables])}", "type": "string", "stats": "Multiple tables available"}]
+            }
+        
+        conn.close()
+        
+        return jsonify({
+            'schema': schema,
+            'schema_info': schema_info
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/generate_sql', methods=['POST'])
 def generate_sql():
