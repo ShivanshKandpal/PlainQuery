@@ -40,6 +40,14 @@
                 <tbody></tbody>
             </table>
         </div>
+        
+        <div id="feedback-section" style="display: none;">
+            <h2>Not what you expected?</h2>
+            <p>If the result doesn't match what you intended, please provide clarification:</p>
+            <textarea id="feedback-input" placeholder="e.g., I meant the name of the school, not the name of the people"></textarea>
+            <button id="submit-feedback-btn">Regenerate with Feedback</button>
+            <div id="feedback-loading" style="display: none;">Regenerating with your feedback...</div>
+        </div>
     </div>
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>

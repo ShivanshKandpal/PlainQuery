@@ -25,6 +25,7 @@ genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 # Monitoring data
 monitoring_data = {
     'requests': [],
+    'feedback_sessions': [],  # Store feedback and regenerations
     'total_cost': 0.0,
     'cost_cap': 10.0  # $10 daily limit
 }
@@ -309,10 +310,15 @@ def generate_sql():
         estimated_cost = estimate_api_cost(prompt, output)
         monitoring_data['total_cost'] += estimated_cost
         
+        # Generate unique request ID for feedback tracking
+        request_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(monitoring_data['requests'])}"
+        
         # Log request for monitoring
         monitoring_data['requests'].append({
+            'request_id': request_id,
             'timestamp': datetime.now().isoformat(),
             'question': question,
+            'sql_query': output,
             'latency': latency,
             'cost': estimated_cost,
             'total_cost': monitoring_data['total_cost']
@@ -343,6 +349,7 @@ def generate_sql():
         conn.close()
         
         return jsonify({
+            'request_id': request_id,
             'sql_query': sql_query, 
             'result': result, 
             'columns': column_names,
@@ -367,18 +374,167 @@ def estimate_api_cost(prompt, response):
     return input_cost + output_cost
 
 
+@app.route('/submit_feedback', methods=['POST'])
+def submit_feedback():
+    """Handle feedback submission and regenerate SQL with user clarification"""
+    start_time = time.time()
+    
+    # Check cost cap
+    if monitoring_data['total_cost'] >= monitoring_data['cost_cap']:
+        return jsonify({'error': 'Daily cost cap reached. Please try again tomorrow.'}), 429
+    
+    data = request.json
+    original_question = data.get('original_question', '')
+    feedback = data.get('feedback', '')
+    request_id = data.get('request_id', '')
+    
+    if not original_question or not feedback:
+        return jsonify({'error': 'Both original_question and feedback are required.'}), 400
+    
+    # Get database schema
+    schema = None
+    db_path = 'database.db' 
+    if os.path.exists(app.config['UPLOAD_FOLDER']):
+        for file in os.listdir(app.config['UPLOAD_FOLDER']):
+            if file.endswith('_context.json'):
+                context_filepath = os.path.join(app.config['UPLOAD_FOLDER'], file)
+                with open(context_filepath, 'r') as f:
+                    context_data = json.load(f)
+                    schema = context_data['schema']
+                    db_path = context_data['db_path']
+                break 
+
+    if not schema:
+        schema = get_db_schema()
+
+    model = genai.GenerativeModel('gemini-1.5-flash')
+
+    # Enhanced prompt with feedback context
+    prompt = f"""
+    You are an expert SQL query generator with a focus on security and accuracy. Generate ONLY a SELECT statement to answer the user's question.
+
+    CRITICAL SECURITY RULES:
+    1. ONLY generate SELECT statements - no INSERT, UPDATE, DELETE, DROP, CREATE, ALTER, or any data modification commands
+    2. Do NOT use any SQL functions that could modify data or system state
+    3. If the question asks for data modification, return "INVALID"
+
+    QUERY OPTIMIZATION RULES:
+    1. Use INNER JOIN by default for relationships - only use LEFT JOIN when explicitly asked to include records with no matches
+    2. Always use proper WHERE clauses to filter data efficiently
+    3. Use aggregate functions (COUNT, SUM, AVG, MAX, MIN) when appropriate
+    4. Include ORDER BY clauses when logical (e.g., sorting by date, amount, name)
+    5. Use LIMIT when appropriate to prevent excessive results
+    6. Group by the correct columns when using aggregate functions
+    7. Use proper aliases for readability: table aliases (t1, c, p) and column aliases (AS total_amount)
+
+    VALIDATION RULES:
+    1. If the question is not a data query (greetings, random statements, non-data questions), return exactly "INVALID"
+    2. If the question asks to modify, delete, or create data, return exactly "INVALID"
+    3. Ensure all column names and table names exist in the provided schema
+    4. Use proper SQL syntax for the SQLite dialect
+
+    ### Database Schema:
+    {schema}
+
+    ### Original User Question:
+    "{original_question}"
+
+    ### User Feedback/Clarification:
+    "{feedback}"
+
+    ### Instructions:
+    The user has provided feedback about their original question. Use this feedback to understand what they actually meant and generate a more accurate SQL query. Pay close attention to the clarification provided in the feedback to correct any misunderstandings from the original query.
+
+    Generate a syntactically correct SELECT query that accurately answers the question based on the user's clarification. Return ONLY the SQL query without any explanation, formatting, or code blocks. If the question is invalid or asks for data modification, return exactly "INVALID".
+
+    ### SQL Query:
+    """
+
+    try:
+        response = model.generate_content(prompt)
+        output = response.text.strip().replace("```sql", "").replace("```", "").strip()
+        
+        # Calculate latency and estimated cost
+        latency = time.time() - start_time
+        estimated_cost = estimate_api_cost(prompt, output)
+        monitoring_data['total_cost'] += estimated_cost
+        
+        # Generate new request ID for the feedback-based query
+        feedback_request_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_fb_{len(monitoring_data['feedback_sessions'])}"
+        
+        # Log feedback session
+        feedback_session = {
+            'feedback_request_id': feedback_request_id,
+            'original_request_id': request_id,
+            'timestamp': datetime.now().isoformat(),
+            'original_question': original_question,
+            'feedback': feedback,
+            'regenerated_sql': output,
+            'latency': latency,
+            'cost': estimated_cost,
+            'total_cost': monitoring_data['total_cost']
+        }
+        
+        monitoring_data['feedback_sessions'].append(feedback_session)
+
+        if output.upper() == 'INVALID':
+            return jsonify({'error': "I'm sorry, I can only answer questions related to the data. Please ask a question about the database content."}), 400
+
+        sql_query = output
+        
+        # Enhanced Safety Check: Only allow SELECT statements and block dangerous patterns
+        sql_upper = sql_query.strip().upper()
+        dangerous_keywords = ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'CREATE', 'ALTER', 'TRUNCATE', 'EXEC', 'EXECUTE', '--', ';', 'PRAGMA']
+        
+        if not sql_upper.startswith('SELECT'):
+            return jsonify({'error': 'Security violation: Only SELECT statements are allowed.'}), 403
+            
+        # Check for dangerous patterns within the query
+        for keyword in dangerous_keywords:
+            if keyword in sql_upper:
+                return jsonify({'error': f'Security violation: Dangerous SQL pattern detected ({keyword}). Only read-only SELECT queries are permitted.'}), 403
+
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+        c.execute(sql_query)
+        result = c.fetchall()
+        column_names = [description[0] for description in c.description]
+        conn.close()
+        
+        return jsonify({
+            'request_id': feedback_request_id,
+            'original_request_id': request_id,
+            'sql_query': sql_query, 
+            'result': result, 
+            'columns': column_names,
+            'latency': round(latency, 3),
+            'cost': round(estimated_cost, 6),
+            'total_cost': round(monitoring_data['total_cost'], 6),
+            'feedback_applied': True
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/monitoring', methods=['GET'])
 def get_monitoring():
     """Get monitoring data including latency, cost, and request history"""
     return jsonify({
         'total_requests': len(monitoring_data['requests']),
+        'total_feedback_sessions': len(monitoring_data['feedback_sessions']),
         'total_cost': round(monitoring_data['total_cost'], 6),
         'cost_cap': monitoring_data['cost_cap'],
         'remaining_budget': round(monitoring_data['cost_cap'] - monitoring_data['total_cost'], 6),
         'recent_requests': monitoring_data['requests'][-10:],  # Last 10 requests
+        'recent_feedback_sessions': monitoring_data['feedback_sessions'][-5:],  # Last 5 feedback sessions
         'average_latency': round(
             sum(req['latency'] for req in monitoring_data['requests']) / len(monitoring_data['requests'])
             if monitoring_data['requests'] else 0, 3
+        ),
+        'feedback_improvement_rate': round(
+            (len(monitoring_data['feedback_sessions']) / len(monitoring_data['requests']) * 100) 
+            if monitoring_data['requests'] else 0, 1
         )
     })
 
@@ -387,6 +543,7 @@ def get_monitoring():
 def reset_monitoring():
     """Reset monitoring data (for testing/daily reset)"""
     monitoring_data['requests'] = []
+    monitoring_data['feedback_sessions'] = []
     monitoring_data['total_cost'] = 0.0
     return jsonify({'message': 'Monitoring data reset successfully'})
 
