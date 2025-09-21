@@ -19,6 +19,7 @@ export interface SchemaColumn {
 }
 
 export interface QueryResult {
+  request_id: string;
   explanation: string;
   sql: string;
   status: "verified" | "error" | "rejected";
@@ -26,6 +27,9 @@ export interface QueryResult {
   cost?: number;
   total_cost?: number;
   data: Record<string, any>[];
+  feedback_applied?: boolean;
+  original_request_id?: string;
+  original_question?: string;
 }
 
 const Index = () => {
@@ -124,13 +128,17 @@ const Index = () => {
       });
       
       setQueryResult({
+        request_id: result.request_id,
         explanation: `Generated SQL query for: "${question}"`,
         sql: result.sql_query,
         status: "verified",
         latency,
         cost: result.cost,
         total_cost: result.total_cost,
-        data
+        data,
+        feedback_applied: result.feedback_applied,
+        original_request_id: result.original_request_id,
+        original_question: question
       });
     } catch (error: any) {
       const latency = (Date.now() - startTime) / 1000;
@@ -144,13 +152,58 @@ const Index = () => {
       }
       
       setQueryResult({
+        request_id: "", // No request ID for errors
         explanation: errorMessage,
         sql: "",
         status: "error",
         latency,
-        data: []
+        data: [],
+        original_question: question
       });
       console.error('Query failed:', error);
+    }
+  };
+
+  const handleFeedback = async (feedback: string) => {
+    if (!queryResult || !queryResult.request_id || !queryResult.original_question) {
+      throw new Error('No current query to provide feedback for');
+    }
+
+    const startTime = Date.now();
+    try {
+      const result = await api.submitFeedback(
+        queryResult.request_id,
+        queryResult.original_question,
+        feedback
+      );
+      
+      const latency = (Date.now() - startTime) / 1000;
+      
+      // Convert the array of arrays result to array of objects
+      const data = result.result.map(row => {
+        const obj: Record<string, any> = {};
+        result.columns.forEach((col, index) => {
+          obj[col] = row[index];
+        });
+        return obj;
+      });
+      
+      setQueryResult({
+        request_id: result.request_id,
+        explanation: `Regenerated SQL query with feedback for: "${queryResult.original_question}"`,
+        sql: result.sql_query,
+        status: "verified",
+        latency,
+        cost: result.cost,
+        total_cost: result.total_cost,
+        data,
+        feedback_applied: true,
+        original_request_id: result.original_request_id,
+        original_question: queryResult.original_question
+      });
+    } catch (error: any) {
+      console.error('Feedback submission failed:', error);
+      throw error;
     }
   };
 
@@ -183,6 +236,7 @@ const Index = () => {
                 dataset={dataset}
                 queryResult={queryResult}
                 onQuery={handleQuery}
+                onFeedback={handleFeedback}
               />
             </TabsContent>
             
