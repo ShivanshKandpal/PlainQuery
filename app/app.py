@@ -16,8 +16,17 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes (needed for frontend)
-app.config['UPLOAD_FOLDER'] = 'uploads'
+# Enable CORS (restrict to env origins in production if provided)
+cors_origins = os.getenv('CORS_ORIGINS')
+if cors_origins:
+    origins_list = [o.strip() for o in cors_origins.split(',') if o.strip()]
+    CORS(app, resources={r"/*": {"origins": origins_list}})
+else:
+    CORS(app)  # Enable CORS for all routes (needed for frontend)
+
+# Configure uploads folder (env override) and ensure it exists in all runtimes
+app.config['UPLOAD_FOLDER'] = os.getenv('UPLOAD_FOLDER', 'uploads')
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Configure the Gemini API
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))

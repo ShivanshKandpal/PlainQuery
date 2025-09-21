@@ -1,3 +1,52 @@
+# PlainQuery
+## Deployment (Render + Vercel)
+
+This repo is configured to deploy the backend (Flask) on Render and the frontend (Vite React) on Vercel.
+
+### 1) Backend on Render
+
+- Prereqs: A Render account and this repository on GitHub.
+- Files added: `render.yaml`, `Procfile`, `.env.example`.
+
+Steps:
+- Push your changes to GitHub.
+- In Render dashboard: New + → Build and deploy from a Git repository → select this repo.
+- Render will detect `render.yaml`. Confirm service `plainquery-backend`.
+- Set the following Environment Variables in the service:
+    - `GEMINI_API_KEY` = your Gemini API key
+    - `CORS_ORIGINS` = https://YOUR-VERCEL-DOMAIN.vercel.app
+    - (optional) `UPLOAD_FOLDER` = uploads
+- Deploy. Note the service base URL, e.g. `https://plainquery-backend.onrender.com`.
+
+### 2) Frontend on Vercel
+
+- Prereqs: A Vercel account linked to GitHub.
+- Files added: `vercel.json`.
+
+Steps:
+- Import this GitHub repo into Vercel.
+- Project root should be the repository root (vercel.json routes requests into `frontend/`).
+- In Project Settings → Environment Variables, add:
+    - `VITE_API_URL` = https://plainquery-backend.onrender.com
+- Trigger a deploy. After deploy, your site URL will be like `https://plainquery-frontend.vercel.app`.
+- Update Render `CORS_ORIGINS` to include that Vercel URL if not set.
+
+### Local Development
+
+Backend:
+- Create `.env` from `.env.example` and set `GEMINI_API_KEY`.
+- Create a venv and install requirements: `pip install -r requirements.txt`.
+- Run: `python app/app.py` (dev) or `gunicorn -w 2 -k gthread -b 0.0.0.0:5000 app.app:app` (prod).
+
+Frontend:
+- `cd frontend`
+- `npm install`
+- `npm run dev`
+- Ensure `VITE_API_URL` in a `.env.local` (optional) or defaults to `http://localhost:5000`.
+
+### Notes
+- SQLite file `database.db` is bundled with repo for demo. Uploads save CSV-converted DBs in `uploads/` and are ephemeral on Render’s free plan; use persistent storage if needed.
+- CORS is open by default; set `CORS_ORIGINS` in production.
 # AI Copilot for Data Teams
 
 This project is an AI-powered assistant that translates natural language questions into SQL queries. It's a web-based application that allows users to get data from a database without writing SQL.

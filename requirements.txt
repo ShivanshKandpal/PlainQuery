@@ -4,3 +4,5 @@ google-generativeai
 python-dotenv
 pandas
 Faker
+gunicorn; sys_platform != 'win32'
+urllib3
