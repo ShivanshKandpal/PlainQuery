@@ -1,27 +1,42 @@
 const API_BASE_URL = 'http://localhost:5000';
 
 export interface ApiQueryResult {
+  request_id: string;
   sql_query: string;
   result: any[][];
   columns: string[];
   latency: number;
   cost: number;
   total_cost: number;
+  feedback_applied?: boolean;
+  original_request_id?: string;
 }
 
 export interface ApiMonitoringResult {
   total_requests: number;
+  total_feedback_sessions: number;
   total_cost: number;
   cost_cap: number;
   remaining_budget: number;
   recent_requests: Array<{
+    request_id: string;
     timestamp: string;
     question: string;
     latency: number;
     cost: number;
     total_cost: number;
   }>;
+  recent_feedback_sessions: Array<{
+    feedback_request_id: string;
+    original_request_id: string;
+    timestamp: string;
+    original_question: string;
+    feedback: string;
+    latency: number;
+    cost: number;
+  }>;
   average_latency: number;
+  feedback_improvement_rate: number;
 }
 
 export interface ApiError {
@@ -121,6 +136,27 @@ export const api = {
     if (!response.ok) {
       const error: ApiError = await response.json();
       throw new Error(error.error || 'Failed to reset monitoring');
+    }
+
+    return response.json();
+  },
+
+  async submitFeedback(requestId: string, originalQuestion: string, feedback: string): Promise<ApiQueryResult> {
+    const response = await fetch(`${API_BASE_URL}/submit_feedback`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        request_id: requestId,
+        original_question: originalQuestion,
+        feedback: feedback,
+      }),
+    });
+
+    if (!response.ok) {
+      const error: ApiError = await response.json();
+      throw new Error(error.error || 'Failed to submit feedback');
     }
 
     return response.json();

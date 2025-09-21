@@ -7,9 +7,10 @@ interface QueryResultsPanelProps {
   dataset: DatasetInfo | null;
   queryResult: QueryResult | null;
   onQuery: (question: string) => Promise<void>;
+  onFeedback: (feedback: string) => Promise<void>;
 }
 
-export const QueryResultsPanel = ({ dataset, queryResult, onQuery }: QueryResultsPanelProps) => {
+export const QueryResultsPanel = ({ dataset, queryResult, onQuery, onFeedback }: QueryResultsPanelProps) => {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleQuery = async (question: string) => {
@@ -34,7 +35,7 @@ export const QueryResultsPanel = ({ dataset, queryResult, onQuery }: QueryResult
       <div className="flex-1 overflow-auto">
         {queryResult && (
           <div className="p-6">
-            <ResultsDisplay result={queryResult} />
+            <ResultsDisplay result={queryResult} onFeedback={onFeedback} />
           </div>
         )}
         
