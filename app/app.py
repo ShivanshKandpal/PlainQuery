@@ -273,7 +273,7 @@ def generate_sql():
     if not schema:
         schema = get_db_schema()
 
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-2.5-flash-lite')
 
     prompt = f"""
     You are an expert SQL query generator with a focus on security and accuracy. Generate ONLY a SELECT statement to answer the user's question.
@@ -416,7 +416,7 @@ def submit_feedback():
     if not schema:
         schema = get_db_schema()
 
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-2.5-flash-lite')
 
     # Enhanced prompt with feedback context
     prompt = f"""
