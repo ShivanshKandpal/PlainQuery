@@ -477,6 +477,19 @@ def submit_feedback():
         
         monitoring_data['feedback_sessions'].append(feedback_session)
 
+        # Also log this feedback request in the main requests array for proper monitoring
+        monitoring_data['requests'].append({
+            'request_id': feedback_request_id,
+            'timestamp': datetime.now().isoformat(),
+            'question': f"{original_question} [FEEDBACK: {feedback}]",
+            'sql_query': output,
+            'latency': latency,
+            'cost': estimated_cost,
+            'total_cost': monitoring_data['total_cost'],
+            'feedback_applied': True,
+            'original_request_id': request_id
+        })
+
         if output.upper() == 'INVALID':
             return jsonify({'error': "I'm sorry, I can only answer questions related to the data. Please ask a question about the database content."}), 400
 
